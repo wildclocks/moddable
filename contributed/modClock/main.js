@@ -59,7 +59,7 @@ import ClockStyle from "styles";
 import html_content from "web";
 import OTARequest from "update";
 
-Timer.delay(1);
+// Timer.delay(1);
 
 import ClockPrefs from "prefs";
 import ClockButton from "buttons";
@@ -67,16 +67,14 @@ import ClockButton from "buttons";
 const PROD_NAME = "ModClock";
 const UPDATE_URL = "http://wildclocks.com/superclock/clock.update.current";
 const REMOTE_SCRIPTS = "http://wildclocks.com/superclock/";
-//const UPDATE_URL = "http://wildclocks.com/superlights/clock.update.current";
-//const REMOTE_SCRIPTS = "http://wildclocks.com/superlights/";
 const LOCAL_SCRIPTS = "http://192.168.4.1/";
 
 const AP_NAME = "clock";
 const AP_PASSWORD = "12345678";
 let ap_name = AP_NAME;
 
-const MAX_WIFI_SCANS = 3;		// before opening the access point
-const SCAN_TIME = 8000;
+const MAX_WIFI_SCANS = 2;		// before opening the access point
+const SCAN_TIME = 5000;
 
 const BUTTON_PIN = 0;
 
@@ -314,18 +312,23 @@ trace(`uiState: SHOW_TIME\n`);
 					break;
 				case "disconnect":
 //					if (undefined === WiFi.status) {
+
+					if (this.connecting) {
 						resetRebootTimer();
 						this.display.value("fail").blink();
+/*
 						if (this.connecting < 2) {
 							this.myWiFi.close();
 							this.myWiFi = undefined;
 							this.connect(ssid, password);
 						}
 						else {
+*/
 							this.connecting = 0;
-							this.checkConnected();
-						}
-//					}
+//							this.checkConnected();
+							this.configAP(ap_name, AP_PASSWORD);
+//						}
+					}
 /*
 					else {		// do we get here?
 							this.connecting = 0;
@@ -366,7 +369,7 @@ trace(`uiState: SHOW_TIME\n`);
 	checkConnected() {
 		if (this.connectionWasEstablished || this.connecting || (undefined !== this.usingAP))
 			return;
-		if (this.wifiScans++ < 3) {
+		if (this.wifiScans++ < MAX_WIFI_SCANS) {
 			Timer.set(id => { this.checkConnected(); }, SCAN_TIME);		// wait ten seconds before falling back to AP
 			this.doWiFiScan(this.prefs.ssid);
 			return;
