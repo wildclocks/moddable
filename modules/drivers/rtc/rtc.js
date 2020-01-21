@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019  Moddable Tech, Inc.
+ * Copyright (c) 2016-2020  Moddable Tech, Inc.
  *
  *   This file is part of the Moddable SDK Runtime.
  * 
@@ -40,14 +40,10 @@ class RTC extends SMBus {
 
 	get enabled() {
 		return this._enabled;
-//		return (super.readByte(DS3231_CONTROL_ADDR) & DS3231_CONTROL_EOSC_BIT) == 0;
 	}
 
 	set enabled(e) {
 		this._enabled = e;
-//		let c = super.readByte(DS3231_CONTROL_ADDR);
-//		c = (c & ~DS3231_CONTROL_EOSC_BIT) | ((0 == e) << DS3231_EOSC_BIT_SHIFT);
-//		super.writeByte(DS3231_CONTROL_ADDR, c);
 	 }
 
 	_getDate() { return { year: 0, month: 1, date: 1, dow: 1, seconds: 0, minutes: 0, hours: 0}; }
@@ -116,7 +112,6 @@ class RTC extends SMBus {
 		time *= 60;
 		time += date.seconds;
 
-trace(` -- returns ${time} seconds\n`);
 		return time;
 	}
 
@@ -124,7 +119,6 @@ trace(` -- returns ${time} seconds\n`);
 		let date = {};
 		let day, time, year, month;
 		
-trace(`set(seconds = ${secs})\n`);
 		day = (secs / SECONDS_IN_DAY)|0;
 		time = secs % SECONDS_IN_DAY;
 		if (time < 0) {
@@ -163,4 +157,6 @@ trace(`set(seconds = ${secs})\n`);
 
 }
 
+Object.freeze(monthsDays);
+Object.freeze(RTC);
 export default RTC;

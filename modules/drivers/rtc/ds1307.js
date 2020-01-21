@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019  Moddable Tech, Inc.
+ * Copyright (c) 2016-2020  Moddable Tech, Inc.
  *
  *   This file is part of the Moddable SDK Runtime.
  * 
@@ -71,7 +71,6 @@ class DS1307 extends RTC {
 		bytes[5] = this.decToBcd(date.month)
 		bytes[6] = this.decToBcd(date.year - 1970);
 
-this.traceBlock("writing", bytes);
 		super.writeBlock(0, buf);
 	}
 

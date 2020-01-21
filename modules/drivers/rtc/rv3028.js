@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019  Moddable Tech, Inc.
+ * Copyright (c) 2016-2020  Moddable Tech, Inc.
  *
  *   This file is part of the Moddable SDK Runtime.
  * 
@@ -83,40 +83,6 @@ class RV3028 extends RTC {
 		c = (c & 0xfe) | (0 == e);		// set last bit to 1 to note disabled
 		super.writeByte(RV3028_STATUS, c);
 	}
-
-/*
-	_getDate() {
-		let date = {};
-//		this.block = super.readBlock(0, 7);
-		this.block = super.readBlock(0, 4);
-		this.unixTime = (this.block[3] << 24) | (this.block[2] << 16) | (this.block[1] << 8) | this.block[0];
-
-//		date.year = this.bcdToDec(this.block[6]);			// year
-//		date.month = this.bcdToDec(this.block[5]);			// month
-//		date.date = this.bcdToDec(this.block[4]);			// day
-//		date.year += 1970;
-//		date.seconds = this.bcdToDec(this.block[0] & 0x7f);		// seconds
-//		date.minutes = this.bcdToDec(this.block[1]);				// minutes
-//		date.hours = this.bcdToDec(this.block[2] & 0x3f);	// hours
-		return date;
-	}
-
-	_setDate(date) {
-		let buf = new ArrayBuffer(7*1);
-		let bytes = new Uint8Array(buf);
-
-		bytes[0] = this.decToBcd(date.seconds);
-		bytes[1] = this.decToBcd(date.minutes);
-		bytes[2] = this.decToBcd(date.hours);
-		bytes[3] = this.decToBcd(date.dow);
-		bytes[4] = this.decToBcd(date.date);
-		bytes[5] = this.decToBcd(date.month)
-		bytes[6] = this.decToBcd(date.year - 1970);
-
-this.traceBlock("writing to 0", bytes);
-		super.writeBlock(0, buf);
-	}
-*/
 
 }
 Object.freeze(RV3028.prototype);
