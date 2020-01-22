@@ -56,6 +56,8 @@ txKind fxTypeOf(txMachine* the, txSlot* theSlot)
 {
 	if (theSlot->kind == XS_STRING_X_KIND)
 		return XS_STRING_KIND;
+	if (theSlot->kind == XS_BIGINT_X_KIND)
+		return XS_BIGINT_KIND;
 	return theSlot->kind;
 }
 
@@ -618,6 +620,8 @@ txSlot* fxNewHostFunction(txMachine* the, txCallback theCallback, txInteger theL
 	/* NAME */
 	if (name != XS_NO_ID)
 		fxRenameFunction(the, instance, name, XS_NO_ID, C_NULL);
+	else if (gxDefaults.newFunctionName)
+		property = gxDefaults.newFunctionName(the, instance, XS_NO_ID, XS_NO_ID, C_NULL);
 
 	return instance;
 }
@@ -1208,13 +1212,13 @@ void fxOverflow(txMachine* the, txInteger theCount, txString thePath, txInteger 
 	if (theCount < 0) {
 		if (aStack < the->stackBottom) {
 			fxReport(the, "stack overflow (%ld)!\n", (the->stack - the->stackBottom) + theCount);
-			fxJump(the);
+			fxAbort(the, XS_STACK_OVERFLOW_EXIT);
 		}
 	}
 	else if (theCount > 0) {
 		if (aStack > the->stackTop) {
 			fxReport(the, "stack overflow (%ld)!\n", theCount - (the->stackTop - the->stack));
-			fxJump(the);
+			fxAbort(the, XS_STACK_OVERFLOW_EXIT);
 		}
 	}
 #endif
@@ -1322,6 +1326,10 @@ txMachine* fxCreateMachine(txCreation* theCreation, txString theName, void* theC
 			fxNewProgramInstance(the);
 			/* mxHosts */
 			mxPushUndefined();
+			/* mxDuringJobs */
+			fxNewInstance(the);
+			/* mxFinalizationGroups */
+			fxNewInstance(the);
 			/* mxPendingJobs */
 			fxNewInstance(the);
 			/* mxRunningJobs */
@@ -1549,7 +1557,7 @@ txMachine* fxCloneMachine(txCreation* theCreation, txMachine* theMachine, txStri
 			if (the->aliasCount) {
 				the->aliasArray = (txSlot **)c_malloc_uint32(the->aliasCount * sizeof(txSlot*));
 				if (!the->aliasArray)
-					fxJump(the);
+					fxAbort(the, XS_NOT_ENOUGH_MEMORY_EXIT);
 				c_memset(the->aliasArray, 0, the->aliasCount * sizeof(txSlot*));
 			}
 
@@ -1561,6 +1569,10 @@ txMachine* fxCloneMachine(txCreation* theCreation, txMachine* theMachine, txStri
 			fxNewProgramInstance(the);
 			/* mxHosts */
 			mxPushUndefined();
+			/* mxDuringJobs */
+			fxNewInstance(the);
+			/* mxFinalizationGroups */
+			fxNewInstance(the);
 			/* mxPendingJobs */
 			fxNewInstance(the);
 			/* mxRunningJobs */
@@ -1578,9 +1590,19 @@ txMachine* fxCloneMachine(txCreation* theCreation, txMachine* theMachine, txStri
 			slot = fxLastProperty(the, fxNewGlobalInstance(the));
 			while (sharedSlot) {
 				slot = slot->next = fxDuplicateSlot(the, sharedSlot);
-				id = slot->ID;
-				if ((id == mxID(_global)) || (id == mxID(_globalThis)))
+				id = slot->ID & 0x7FFF;
+				if ((_Array <= id) && (id < _Infinity))
+					slot->flag = XS_DONT_ENUM_FLAG;
+				else if ((_Infinity <= id) && (id < _Compartment))
+					slot->flag = XS_GET_ONLY;
+				else if ((_Compartment <= id) && (id < ___proto__))
+					slot->flag = XS_DONT_ENUM_FLAG;
+				else if ((id == _global) || (id == _globalThis)) {
 					slot->value.reference = the->stack->value.reference;
+					slot->flag = XS_DONT_ENUM_FLAG;
+				}
+				else
+					slot->flag = XS_NO_FLAG;
 				sharedSlot = sharedSlot->next;
 			}
 			mxGlobal.value = the->stack->value;
@@ -1614,7 +1636,7 @@ txMachine* fxPrepareMachine(txCreation* creation, txPreparation* preparation, tx
 {
 	txMachine _root;
 	txMachine* root = &_root;
-	if ((preparation->version[0] != XS_MAJOR_VERSION) || (preparation->version[1] != XS_MINOR_VERSION) || (preparation->version[2] != XS_PATCH_VERSION))
+	if ((preparation->version[0] != XS_MAJOR_VERSION) || (preparation->version[1] != XS_MINOR_VERSION))
 		return C_NULL;
 	c_memset(root, 0, sizeof(txMachine));
 	root->preparation = preparation;
@@ -1771,6 +1793,17 @@ void fxEndHost(txMachine* the)
 	the->scope = the->frame->value.frame.scope;
 	the->code = the->frame->value.frame.code;
 	the->frame = the->frame->next;
+	if (the->frame == C_NULL) {
+		fxEndJob(the);
+	}
+}
+
+void fxEndJob(txMachine* the)
+{
+	if (mxDuringJobs.kind == XS_REFERENCE_KIND)
+		mxDuringJobs.value.reference->next = C_NULL;
+	if (gxDefaults.cleanupFinalizationGroups)
+		gxDefaults.cleanupFinalizationGroups(the);
 }
 
 typedef struct {
@@ -1983,7 +2016,7 @@ void* fxMapArchive(txPreparation* preparation, void* src, void* dst, size_t buff
 		mxElseThrow(atom.atomSize == sizeof(Atom) + 4);
 		mxElseThrow(*p++ == XS_MAJOR_VERSION);
 		mxElseThrow(*p++ == XS_MINOR_VERSION);
-		mxElseThrow(*p++ == XS_PATCH_VERSION);
+		p++;
 		flag = p;
 		p++;
 		mxMapAtom(p);
@@ -2013,7 +2046,7 @@ void* fxMapArchive(txPreparation* preparation, void* src, void* dst, size_t buff
 			mxElseInstall(atom.atomSize == sizeof(Atom) + 4);
 			mxElseInstall(*q++ == XS_MAJOR_VERSION);
 			mxElseInstall(*q++ == XS_MINOR_VERSION);
-			mxElseInstall(*q++ == XS_PATCH_VERSION);
+			q++;
 			q++;
 			mxMapAtom(q);
 			mxElseInstall(atom.atomType == XS_ATOM_SIGNATURE);
